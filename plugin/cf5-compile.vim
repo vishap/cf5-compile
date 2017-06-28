@@ -124,10 +124,10 @@ function! s:CompileGCC(run) "{{{2
     let exename=expand("%:p:r:s,$,.exe,")
     let srcname=expand("%")
     " compile it
-    let ccline="g++ ".b:cppflags." ".b:lcppflags." ".b:ldflags." ".srcname." -o".exename
+    let ccline="g++ ".b:cppflags." ".b:lcppflags." ".srcname." ".b:ldflags." -o".exename
     call s:appendOutput(ccline)
     let cout = system( ccline )
-    if v:shell_error 
+    if v:shell_error
         call s:appendOutput(cout)
         return 
     endif
