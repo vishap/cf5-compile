@@ -45,29 +45,19 @@
 "                   map <silent> <F5> :call CF5Compile(0)<CR>
 "
 "                   This will allow Ctrl-F5 to "compile and run" and F5 to only
-"                   "compile" the file. Please, note that "filetype" is used to
-"                   define the compiler/interpreter used.
+"                   "compile" the file.
 "
 "               The value of the following variables are used while compiling
 "               a file:
-"                   b:argv - command line arguments to pass to program.
-"                   b:flags - flags to pass to interpreter.
-"                   b:cppflags - flags to pass to c++ compiler.
-"                   b:wcppflags - flags to pass to (windows) compiler.
-"                   b:lcppflags - flags to pass to (linux) compiler.
-"                   b:ldflags - flags to pass to linker.
-"                   b:ldlibpath - paths to add to PATH or LD_LIBRARY_PATH.
+"                   b:cf5build - build command.
+"                   b:cf5run   - run command.
 "
 "               I personally use this script with let-modeline.vim. The last
 "               allows to define some of compiler options right in the file. For
 "               example I have the following header in some of my cpp files:
 "               /*
-"               VIM: let b:lcppflags="-std=c++11 -O2 -pthread"
-"               VIM: let b:wcppflags="/O2 /EHsc /DWIN32"
-"               VIM: let b:cppflags=b:Iboost.b:Itbb
-"               VIM: let b:ldflags=b:Lboost.b:Ltbb.b:tbbmalloc.b:tbbmproxy
-"               VIM: let b:ldlibpath=b:Bboost.b:Btbb
-"               VIM: let b:argv=""
+"               VIM: let b:cdf5build="clang -std=c++20 -lstdc++ {SRC} -o {SRC}.out"
+"               VIM: let b:cf5run="{SRC}.out"
 "               */
 "
 "               You might also consider using independence.vim or localvimrc.vim
@@ -182,7 +172,34 @@ function! s:InterpretMatlab(run)
     endif
 endfunction
 
+function! s:Cf5BuildAndRun(run)
+    let exename=expand("%:p:r:s,$,.exe,")
+    let srcname=expand("%")
+    " compile it
+    let ccline=substitute(b:cf5build, "{SRC}", srcname, "g")
+    let ccline=substitute(ccline, "{OUT}", exename, "g")
+    call s:appendOutput(ccline)
+    let cout = system( ccline )
+    if v:shell_error
+        call s:appendOutput(cout)
+        return
+    endif
+    call s:appendOutput(cout)
+    " run it
+    if a:run == 1 && b:cf5run!=""
+        let $LD_LIBRARY_PATH="LD_LIBRARY_PATH=".b:ldlibpath.":".$LD_LIBRARY_PATH
+        let cmdline=substitute(b:cf5run, "{OUT}", exename, "g")
+        call s:appendOutput(cmdline)
+        let eout = system( cmdline )
+        call s:appendOutput(eout)
+    endif
+endfunction
+
 function! s:Compile(run)
+    if b:cf5build!=""
+        call s:Cf5BuildAndRun(a:run)
+        return
+    endif
     if &filetype=="c" || &filetype=="cpp"
         if has("win32") || has("win64")
             call s:CompileMSVC(a:run)
@@ -271,6 +288,8 @@ endfunction
 function CF5CompileInitBufferVariables()
     let b:argv=""
     let b:flags=""
+    let b:cf5build=""
+    let b:cf5run=""
     let b:cppflags=""
     let b:wcppflags="/O2 /EHsc /DWIN32"
     let b:lcppflags="-O2"
